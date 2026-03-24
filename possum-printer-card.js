@@ -12,9 +12,11 @@ class PossumPrinterCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._longPressTimers = {};
-    this._longPressFired  = {};
-    this._popupOverlay    = null;
+    this._longPressTimers    = {};
+    this._longPressFired     = {};
+    this._popupOverlay       = null;
+    this._bootingUp          = false;
+    this._bootFlashInterval  = null;
   }
 
   static getConfigElement() {
@@ -55,7 +57,7 @@ class PossumPrinterCard extends HTMLElement {
   }
 
   connectedCallback() {}
-  disconnectedCallback() {}
+  disconnectedCallback() { this._stopBootFlash(); }
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -333,13 +335,19 @@ class PossumPrinterCard extends HTMLElement {
     const isOffline  = !!cfg.printer_entity &&
       (!printerStateObj || ['unavailable','unknown'].includes(statusRaw) || statusRaw.toLowerCase() === 'offline');
 
-    const statusTextEl = root.getElementById('pp-status-text');
-    const statusDotEl  = root.getElementById('pp-status-dot');
-    const statusPillEl = root.getElementById('pp-status-pill');
-    if (statusTextEl) statusTextEl.textContent = statusInfo.label;
-    if (statusDotEl)  statusDotEl.style.background = statusInfo.dotColor;
-    if (statusPillEl) {
-      statusPillEl.style.borderColor = `${statusInfo.color}66`;
+    // If we were waiting for the printer to boot and it's now online, stop flashing
+    if (this._bootingUp && !isOffline) {
+      this._stopBootFlash();
+    }
+
+    // Only update pill DOM when not mid-boot-flash (flash loop owns those elements)
+    if (!this._bootingUp) {
+      const statusTextEl = root.getElementById('pp-status-text');
+      const statusDotEl  = root.getElementById('pp-status-dot');
+      const statusPillEl = root.getElementById('pp-status-pill');
+      if (statusTextEl) statusTextEl.textContent = statusInfo.label;
+      if (statusDotEl)  statusDotEl.style.background = statusInfo.dotColor;
+      if (statusPillEl) statusPillEl.style.borderColor = `${statusInfo.color}66`;
     }
 
     // ── Offline class on rings container ──
@@ -482,7 +490,7 @@ class PossumPrinterCard extends HTMLElement {
     if (isOffline) {
       // Printer is off — turn smart plug ON to power it up
       hass.callService('homeassistant', 'turn_on', { entity_id: plugId });
-      this._showPillFeedback('Turning on…', '#34C759');
+      this._startBootFlash();
     } else if (statusRaw === 'idle') {
       // Printer is idle — turn smart plug OFF to save power
       hass.callService('homeassistant', 'turn_off', { entity_id: plugId });
@@ -493,6 +501,45 @@ class PossumPrinterCard extends HTMLElement {
     }
   }
 
+  _startBootFlash() {
+    this._stopBootFlash(); // clear any previous
+    this._bootingUp = true;
+
+    const root   = this.shadowRoot;
+    const textEl = root.getElementById('pp-status-text');
+    const dotEl  = root.getElementById('pp-status-dot');
+    const pillEl = root.getElementById('pp-status-pill');
+    if (!textEl || !dotEl || !pillEl) return;
+
+    const YELLOW = '#FF9500';
+    let flash = true;
+
+    const apply = () => {
+      if (!this._bootingUp) return;
+      textEl.textContent       = 'Starting…';
+      dotEl.style.background   = flash ? YELLOW : 'rgba(255,255,255,0.18)';
+      pillEl.style.borderColor = flash ? `${YELLOW}88` : 'rgba(255,255,255,0.10)';
+      pillEl.style.color       = flash ? YELLOW : 'rgba(255,255,255,0.35)';
+      flash = !flash;
+    };
+
+    apply();
+    this._bootFlashInterval = setInterval(apply, 600);
+  }
+
+  _stopBootFlash() {
+    if (this._bootFlashInterval) {
+      clearInterval(this._bootFlashInterval);
+      this._bootFlashInterval = null;
+    }
+    this._bootingUp = false;
+
+    // Reset any inline styles set by the flash so _updateCard takes over cleanly
+    const root   = this.shadowRoot;
+    const pillEl = root.getElementById('pp-status-pill');
+    if (pillEl) pillEl.style.color = '';
+  }
+
   _showPillFeedback(text, color) {
     const root      = this.shadowRoot;
     const textEl    = root.getElementById('pp-status-text');
@@ -500,8 +547,8 @@ class PossumPrinterCard extends HTMLElement {
     const pillEl    = root.getElementById('pp-status-pill');
     if (!textEl || !dotEl || !pillEl) return;
 
-    const origText       = textEl.textContent;
-    const origDotColor   = dotEl.style.background;
+    const origText        = textEl.textContent;
+    const origDotColor    = dotEl.style.background;
     const origBorderColor = pillEl.style.borderColor;
 
     textEl.textContent       = text;
