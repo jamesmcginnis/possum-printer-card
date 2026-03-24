@@ -1,6 +1,6 @@
 # 🐾 Possum Printer Card
 
-A Home Assistant Dashboard card that displays printer ink and toner levels as smooth animated circular progress rings — with smart plug control, boot-state feedback, offline detection, and tap-to-inspect popups.
+A Home Assistant Dashboard card that displays printer ink and toner levels as smooth animated circular progress rings — with smart plug control, live power-state feedback, offline detection, and tap-to-inspect popups.
 
 ---
 
@@ -17,8 +17,9 @@ A Home Assistant Dashboard card that displays printer ink and toner levels as sm
 - **Four animated rings** showing Black, Cyan, Magenta, and Yellow ink/toner levels with a breathing glow effect
 - **Status pill** — Idle, Printing, Ready, Sleep, Error — with a colour-coded dot
 - **Offline mode** — all rings grey out and show `--` when the printer is unavailable
-- **Smart plug control** — link any `switch.*` entity to the status pill; tap to power the printer on when Offline or off when Idle
-- **Boot flash** — after powering on, the pill flashes amber *Starting…* until the printer comes back online, so you always know the command worked
+- **Smart plug control** — link any `switch.*` entity to the status pill; tap to power the printer on or off
+- **Powering On flash** — pill flashes amber *Powering On* after turning on, stopping only when ink sensors report real values
+- **Powering Off flash** — pill flashes amber *Powering Off* after turning off, stopping only when ink sensors go unavailable
 - **Tap a ring** for a detailed popup: level badge, entity attributes, and last-updated time
 - **Long-press a ring** to open the native Home Assistant More Info panel
 - **Tap the status pill or printer name** for a full printer status popup
@@ -28,13 +29,15 @@ A Home Assistant Dashboard card that displays printer ink and toner levels as sm
 
 ## 🔌 Smart Plug Control
 
-Enable the smart plug option in the visual editor and link any switch or plug entity. The status pill then acts as a contextual power button:
+Enable the smart plug option in the visual editor and link any switch or plug entity. The status pill then acts as a contextual power button with live feedback:
 
 | Pill state | Tap action |
 |---|---|
-| **Offline** | Turns plug **on** — pill flashes amber *Starting…* until printer responds |
-| **Idle** | Turns plug **off** — brief *Turning off…* confirmation |
+| **Offline** | Turns plug **on** — pill flashes amber *Powering On* until ink sensors return valid readings |
+| **Idle** | Turns plug **off** — pill flashes amber *Powering Off* until ink sensors go unavailable |
 | Printing / Ready / Error / other | Opens the status info popup |
+
+The flash is driven by the ink level sensors themselves, not a timer — so the pill switches back to normal the moment the printer is genuinely up or genuinely down.
 
 Works with Shelly, Tasmota, TP-Link Kasa, Sonoff, Wemo, IKEA, Philips Hue, and any other `switch.*` entity.
 
@@ -72,6 +75,3 @@ smart_plug_entity: switch.printer_plug
 
 <p align="center">
   <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=jamesmcginnis&repository=possum-printer-card&category=plugin">
- 
-
----
