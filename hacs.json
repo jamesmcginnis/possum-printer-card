@@ -1,0 +1,9 @@
+{
+  "name": "Possum Printer Card",
+  "description": "A Home Assistant Daashboard card that displays printer ink levels as animated circular progress rings, with status pill, offline detection, and tap-to-inspect popups.",
+  "render_readme": true,
+  "filename": "possum-printer-card.js",
+  "content_in_root": true,
+  "homeassistant": "2023.1.0",
+  "iot_class": "local_polling"
+}
