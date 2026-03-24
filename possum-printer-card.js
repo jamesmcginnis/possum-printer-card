@@ -67,14 +67,17 @@ class PossumPrinterCard extends HTMLElement {
     const circ = 2 * Math.PI * 34;
 
     const hexBg = cfg.card_bg || '#1c1c1e';
-    let r = 28, g = 28, b = 30;
+    let r = 28, g = 28, b = 30, op = (parseInt(cfg.card_bg_opacity) || 80) / 100;
     try {
       r = parseInt(hexBg.slice(1,3),16);
       g = parseInt(hexBg.slice(3,5),16);
       b = parseInt(hexBg.slice(5,7),16);
+      // 8-digit hex (#rrggbbaa) — alpha channel overrides the opacity slider
+      if (/^#[0-9a-fA-F]{8}$/.test(hexBg)) {
+        op = parseInt(hexBg.slice(7,9),16) / 255;
+      }
     } catch(e) {}
-    const op    = (parseInt(cfg.card_bg_opacity) || 80) / 100;
-    const bgCss = `rgba(${r},${g},${b},${op})`;
+    const bgCss = `rgba(${r},${g},${b},${op.toFixed(3)})`;
     const tc    = cfg.text_color || '#ffffff';
 
     const INK = [
@@ -853,12 +856,12 @@ class PossumPrinterCardEditor extends HTMLElement {
     if (opLabel) opLabel.textContent = `${cfg.card_bg_opacity ?? 80}%`;
 
     for (const field of this._getColourFields()) {
-      const card = root.querySelector(`.pp-colour-card[data-key="${field.key}"]`);
+      const card = root.querySelector(`.colour-card[data-key="${field.key}"]`);
       if (!card) continue;
       const val     = cfg[field.key] || field.default;
-      const preview = card.querySelector('.pp-colour-preview');
-      const dot     = card.querySelector('.pp-colour-dot');
-      const hexIn   = card.querySelector('.pp-colour-hex');
+      const preview = card.querySelector('.colour-swatch-preview');
+      const dot     = card.querySelector('.colour-dot');
+      const hexIn   = card.querySelector('.colour-hex');
       const picker  = card.querySelector('input[type=color]');
       if (preview) preview.style.background = val;
       if (dot)     dot.style.background     = val;
@@ -869,13 +872,13 @@ class PossumPrinterCardEditor extends HTMLElement {
 
   _getColourFields() {
     return [
-      { key: 'ink_black_color',   label: 'Black Ink',        desc: 'Ring colour for black / K',   default: '#000000' },
-      { key: 'ink_cyan_color',    label: 'Cyan Ink',         desc: 'Ring colour for cyan / C',    default: '#00ffff' },
-      { key: 'ink_magenta_color', label: 'Magenta Ink',      desc: 'Ring colour for magenta / M', default: '#ff00ff' },
-      { key: 'ink_yellow_color',  label: 'Yellow Ink',       desc: 'Ring colour for yellow / Y',  default: '#ffff00' },
-      { key: 'pct_text_color',    label: 'Percentage Text',  desc: 'Number shown inside each ring', default: '#ffffff' },
-      { key: 'card_bg',           label: 'Card BG',          desc: 'Card background colour',      default: '#1c1c1e' },
-      { key: 'text_color',        label: 'Text',             desc: 'Primary text colour',         default: '#ffffff' },
+      { key: 'ink_black_color',   label: 'Black Ink',       desc: 'Ring colour for black / K',                                   default: '#000000', maxlen: 7 },
+      { key: 'ink_cyan_color',    label: 'Cyan Ink',        desc: 'Ring colour for cyan / C',                                    default: '#00ffff', maxlen: 7 },
+      { key: 'ink_magenta_color', label: 'Magenta Ink',     desc: 'Ring colour for magenta / M',                                 default: '#ff00ff', maxlen: 7 },
+      { key: 'ink_yellow_color',  label: 'Yellow Ink',      desc: 'Ring colour for yellow / Y',                                  default: '#ffff00', maxlen: 7 },
+      { key: 'pct_text_color',    label: 'Percentage Text', desc: 'Number shown inside each ring',                               default: '#ffffff', maxlen: 7 },
+      { key: 'card_bg',           label: 'Card Background', desc: '#00000000 = glass transparent · 8-digit hex sets opacity e.g. #1c1c1e80', default: '#1c1c1e', maxlen: 9 },
+      { key: 'text_color',        label: 'Text',            desc: 'Primary text colour',                                         default: '#ffffff', maxlen: 7 },
     ];
   }
 
@@ -1068,35 +1071,75 @@ class PossumPrinterCardEditor extends HTMLElement {
         }
         .input-row input::placeholder { color: rgba(128,128,128,0.55); }
 
-        /* Colour cards */
-        .pp-colour-card {
-          display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-          border-bottom: 1px solid rgba(128,128,128,0.1);
+        /* ── Colour pickers — leopard style ── */
+        .colour-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          padding: 10px;
         }
-        .pp-colour-card:last-child { border-bottom: none; }
-        .pp-colour-swatch {
-          width: 38px; height: 38px; border-radius: 10px; overflow: hidden;
-          flex-shrink: 0; position: relative; cursor: pointer;
-          border: 1.5px solid rgba(255,255,255,0.12);
+        .colour-card {
+          border: 1px solid var(--divider-color, rgba(128,128,128,0.18));
+          border-radius: 10px;
+          overflow: hidden;
+          cursor: pointer;
+          transition: box-shadow 0.15s, border-color 0.15s;
+          position: relative;
         }
-        .pp-colour-preview { position: absolute; inset: 0; }
-        .pp-colour-swatch input[type=color] {
-          position: absolute; inset: -4px; opacity: 0; cursor: pointer;
-          width: calc(100% + 8px); height: calc(100% + 8px);
-          padding: 0; border: none; background: none; background-image: none;
+        .colour-card:hover {
+          box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+          border-color: var(--primary-color, #007AFF);
         }
-        .pp-colour-info    { flex: 1; min-width: 0; }
-        .pp-colour-label   { font-size: 13px; font-weight: 600; color: var(--primary-text-color, #fff); }
-        .pp-colour-desc    { font-size: 11px; color: #888; margin-top: 1px; }
-        .pp-colour-hex-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
-        .pp-colour-dot     { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.15); }
-        .pp-colour-hex {
-          background: transparent; border: 1px solid rgba(128,128,128,0.25);
-          border-radius: 5px; color: var(--primary-text-color, #fff);
-          font-size: 12px; font-family: monospace; padding: 3px 7px; width: 82px;
-          outline: none; background-image: none;
+        .colour-swatch {
+          height: 44px; width: 100%;
+          display: block; position: relative;
         }
-        .pp-colour-hex:focus { border-color: rgba(128,128,128,0.45); }
+        .colour-swatch input[type="color"] {
+          position: absolute; inset: 0;
+          width: 100%; height: 100%;
+          opacity: 0; cursor: pointer; border: none; padding: 0;
+        }
+        .colour-swatch-preview { position: absolute; inset: 0; pointer-events: none; }
+        .colour-swatch::before {
+          content: ''; position: absolute; inset: 0;
+          background-image:
+            linear-gradient(45deg, #ccc 25%, transparent 25%),
+            linear-gradient(-45deg, #ccc 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #ccc 75%),
+            linear-gradient(-45deg, transparent 75%, #ccc 75%);
+          background-size: 8px 8px;
+          background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+          opacity: 0.3; pointer-events: none;
+        }
+        .colour-info {
+          padding: 6px 8px 7px;
+          background: var(--card-background-color, #1c1c1e);
+        }
+        .colour-label {
+          font-size: 11px; font-weight: 700;
+          color: var(--primary-text-color, #fff); letter-spacing: 0.02em; margin-bottom: 1px;
+        }
+        .colour-desc {
+          font-size: 10px; color: var(--secondary-text-color, #888);
+          margin-bottom: 4px; line-height: 1.3;
+        }
+        .colour-hex-row { display: flex; align-items: center; gap: 4px; }
+        .colour-dot {
+          width: 12px; height: 12px; border-radius: 50%;
+          border: 1px solid rgba(128,128,128,0.25); flex-shrink: 0;
+        }
+        .colour-hex {
+          flex: 1; font-size: 11px; font-family: monospace;
+          border: none; background: none;
+          color: var(--secondary-text-color, #888);
+          padding: 0; width: 0; min-width: 0;
+        }
+        .colour-hex:focus { outline: none; color: var(--primary-text-color, #fff); }
+        .colour-edit-icon {
+          opacity: 0; transition: opacity 0.15s;
+          color: var(--secondary-text-color, #888); font-size: 13px; line-height: 1;
+        }
+        .colour-card:hover .colour-edit-icon { opacity: 1; }
 
         /* Opacity slider */
         .opacity-row {
@@ -1229,33 +1272,36 @@ class PossumPrinterCardEditor extends HTMLElement {
 
       </div>`;
 
-    // ── Build colour picker cards ───────────────────────────────────
+    // ── Build colour picker cards (leopard style) ──────────────────
     const grid = this.shadowRoot.getElementById('pp-colour-grid');
     for (const field of COLOUR_FIELDS) {
-      const savedVal = cfg[field.key] || field.default;
-      const pickerHex = /^#[0-9a-fA-F]{6}$/.test(savedVal) ? savedVal : field.default;
+      const savedVal  = cfg[field.key] || '';
+      const swatchVal = savedVal || field.default;
+      const pickerHex = /^#[0-9a-fA-F]{6}$/.test(swatchVal) ? swatchVal : swatchVal.substring(0, 7);
 
       const card = document.createElement('div');
-      card.className = 'pp-colour-card';
+      card.className   = 'colour-card';
       card.dataset.key = field.key;
       card.innerHTML = `
-        <label class="pp-colour-swatch">
-          <div class="pp-colour-preview" style="background:${savedVal}"></div>
+        <label class="colour-swatch">
+          <div class="colour-swatch-preview" style="background:${swatchVal}"></div>
           <input type="color" value="${pickerHex}">
         </label>
-        <div class="pp-colour-info">
-          <div class="pp-colour-label">${field.label}</div>
-          <div class="pp-colour-desc">${field.desc}</div>
-          <div class="pp-colour-hex-row">
-            <div class="pp-colour-dot" style="background:${savedVal}"></div>
-            <input class="pp-colour-hex" type="text" value="${savedVal}" maxlength="7" placeholder="${field.default}" spellcheck="false">
+        <div class="colour-info">
+          <div class="colour-label">${field.label}</div>
+          <div class="colour-desc">${field.desc}</div>
+          <div class="colour-hex-row">
+            <div class="colour-dot" style="background:${swatchVal}"></div>
+            <input class="colour-hex" type="text" value="${savedVal}"
+              maxlength="${field.maxlen}" placeholder="${field.default}" spellcheck="false">
+            <span class="colour-edit-icon">✎</span>
           </div>
         </div>`;
 
       const picker  = card.querySelector('input[type=color]');
-      const hexIn   = card.querySelector('.pp-colour-hex');
-      const preview = card.querySelector('.pp-colour-preview');
-      const dot     = card.querySelector('.pp-colour-dot');
+      const hexIn   = card.querySelector('.colour-hex');
+      const preview = card.querySelector('.colour-swatch-preview');
+      const dot     = card.querySelector('.colour-dot');
 
       const apply = val => {
         preview.style.background = val;
@@ -1267,13 +1313,13 @@ class PossumPrinterCardEditor extends HTMLElement {
 
       picker.addEventListener('input',  () => apply(picker.value));
       picker.addEventListener('change', () => apply(picker.value));
-      hexIn.addEventListener('input',   () => {
+      hexIn.addEventListener('input', () => {
         const v = hexIn.value.trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(v)) apply(v);
+        if (/^#[0-9a-fA-F]{6}$/.test(v) || /^#[0-9a-fA-F]{8}$/.test(v)) apply(v);
       });
       hexIn.addEventListener('blur', () => {
         const cur = this._config[field.key] || field.default;
-        if (!/^#[0-9a-fA-F]{6}$/.test(hexIn.value.trim())) hexIn.value = cur;
+        if (!/^#[0-9a-fA-F]{6,8}$/.test(hexIn.value.trim())) hexIn.value = cur;
       });
       hexIn.addEventListener('keydown', e => { if (e.key === 'Enter') hexIn.blur(); });
 
