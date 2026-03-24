@@ -2,8 +2,6 @@
 
 A Home Assistant Dashboard card that shows your printer's ink and toner levels as smooth animated circular progress rings — with offline detection, a status pill, smart plug control, and tap-to-inspect popups.
 
-
-
 ---
 
 ## ✨ Features
@@ -12,7 +10,8 @@ A Home Assistant Dashboard card that shows your printer's ink and toner levels a
 - **Status pill** — shows Idle, Printing, Ready, Sleep, Error, and more with a matching colour-coded dot
 - **Offline detection** — all rings grey out and display `--` when the printer is unavailable
 - **Smart plug control** — optionally link a smart plug or switch; tap the pill to turn the printer on when Offline or off when Idle
-- **Boot flash** — after powering on, the pill flashes amber *Starting…* until the printer comes back online
+- **Powering On flash** — after tapping to power on, the pill flashes amber *Powering On* until the ink level sensors become available, then returns to normal
+- **Powering Off flash** — after tapping to power off, the pill flashes amber *Powering Off* until the ink level sensors go unavailable, then returns to normal
 - **Tap a ring** — opens a polished popup with level badge (Good / Running Low / Replace Soon), entity attributes, and last-updated time
 - **Long-press a ring** — opens the native Home Assistant More Info dialog for that entity
 - **Tap the status pill** — opens a detailed printer status popup (or toggles the smart plug when Idle/Offline)
@@ -124,8 +123,8 @@ smart_plug_entity: switch.printer_plug
 | **Tap** a ring | Opens a custom info popup for that ink colour |
 | **Long-press** a ring | Opens the native HA More Info dialog |
 | **Tap** the status pill *(smart plug disabled)* | Opens printer status popup |
-| **Tap** the status pill — **Offline** *(smart plug enabled)* | Turns the smart plug **on**, pill flashes *Starting…* until printer is online |
-| **Tap** the status pill — **Idle** *(smart plug enabled)* | Turns the smart plug **off** |
+| **Tap** the status pill — **Offline** *(smart plug enabled)* | Turns plug **on** · pill flashes *Powering On* until ink sensors are available |
+| **Tap** the status pill — **Idle** *(smart plug enabled)* | Turns plug **off** · pill flashes *Powering Off* until ink sensors are unavailable |
 | **Tap** the status pill — any other state | Opens printer status popup |
 | **Tap** the printer name | Opens printer status popup |
 
@@ -135,9 +134,14 @@ smart_plug_entity: switch.printer_plug
 
 When smart plug control is enabled the status pill doubles as a contextual power button:
 
-- **Printer is Offline** → tap the pill → smart plug turns **on**, powering the printer. The pill immediately begins flashing amber *Starting…* and continues until Home Assistant reports the printer is back online — no guessing whether the command worked.
-- **Printer is Idle** → tap the pill → smart plug turns **off**, cutting standby draw. The pill briefly shows *Turning off…* in amber as confirmation.
-- **Any other state** (Printing, Ready, Sleep, Error…) → tapping opens the normal status popup so you can never accidentally cut power mid-print.
+**Powering on (Offline → tap):**
+The plug turns on and the pill immediately begins flashing amber *Powering On*. It keeps flashing until Home Assistant reports that at least one of the configured ink level sensors returns a valid reading — the clearest signal that the printer is fully up. At that point the pill returns to its normal label (Ready, Idle, etc.).
+
+**Powering off (Idle → tap):**
+The plug turns off and the pill immediately begins flashing amber *Powering Off*. It keeps flashing until every configured ink level sensor goes unavailable — confirming the printer has fully powered down. At that point the pill returns to its normal Offline state.
+
+**Any other state** (Printing, Ready, Sleep, Error…):
+Tapping the pill opens the normal status popup — you can never accidentally cut power mid-print.
 
 The feature works with any `switch.*` or `input_boolean.*` entity, including devices from Shelly, Tasmota, TP-Link Kasa, Sonoff, Wemo, IKEA, and Philips Hue.
 
