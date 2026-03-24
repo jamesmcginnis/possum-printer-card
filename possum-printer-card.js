@@ -293,7 +293,7 @@ class PossumPrinterCard extends HTMLElement {
                   <div class="pp-ring-center">
                     <span class="pp-pct" id="pp-pct-${ink.key}" style="color:${cfg.pct_text_color || '#ffffff'}">--</span>
                     <span class="pp-pct-unit">%</span>
-                    <span class="pp-offline-text">Off-<br>line</span>
+                    <span class="pp-offline-text">Off</span>
                   </div>
                 </div>
                 <span class="pp-colour-label">${ink.label}</span>
@@ -601,12 +601,12 @@ class PossumPrinterCard extends HTMLElement {
             style="stroke-dasharray:${circ.toFixed(2)};stroke-dashoffset:${arcOffset};transform:rotate(-90deg);transform-origin:44px 44px;"/>
         </svg>
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-          <span style="font-size:19px;font-weight:700;color:${color};line-height:1;">${pct !== null ? Math.round(pct) : '--'}</span>
+          <span style="font-size:19px;font-weight:700;color:${cfg.pct_text_color || '#ffffff'};line-height:1;">${pct !== null ? Math.round(pct) : '--'}</span>
           <span style="font-size:9px;color:rgba(255,255,255,0.32);margin-top:1px;">%</span>
         </div>
       </div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:22px;font-weight:700;color:${color};margin-bottom:8px;line-height:1;">${meta.label} Ink</div>
+        <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:8px;line-height:1;">${meta.label} Ink</div>
         <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.04em;background:${levelColor}22;color:${levelColor};border:1px solid ${levelColor}44;">${levelLabel}</span>
       </div>`;
     popup.appendChild(hero);
