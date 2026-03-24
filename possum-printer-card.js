@@ -37,6 +37,7 @@ class PossumPrinterCard extends HTMLElement {
       ink_cyan_color:       '#00ffff',
       ink_magenta_color:    '#ff00ff',
       ink_yellow_color:     '#ffff00',
+      pct_text_color:       '#ffffff',
     };
   }
 
@@ -290,7 +291,7 @@ class PossumPrinterCard extends HTMLElement {
                              transition:stroke-dashoffset 0.9s cubic-bezier(0.34,1,0.64,1),stroke 0.4s ease;"/>
                   </svg>
                   <div class="pp-ring-center">
-                    <span class="pp-pct" id="pp-pct-${ink.key}" style="color:${color}">--</span>
+                    <span class="pp-pct" id="pp-pct-${ink.key}" style="color:${cfg.pct_text_color || '#ffffff'}">--</span>
                     <span class="pp-pct-unit">%</span>
                     <span class="pp-offline-text">Off-<br>line</span>
                   </div>
@@ -373,7 +374,7 @@ class PossumPrinterCard extends HTMLElement {
 
       if (pctEl) {
         pctEl.textContent = pct !== null ? Math.round(pct) : '--';
-        pctEl.style.color = dispColor;
+        pctEl.style.color = isOffline ? 'rgba(255,255,255,0.18)' : (cfg.pct_text_color || '#ffffff');
       }
 
       if (blkEl) {
@@ -760,12 +761,13 @@ class PossumPrinterCardEditor extends HTMLElement {
 
   _getColourFields() {
     return [
-      { key: 'ink_black_color',   label: 'Black Ink',   desc: 'Ring colour for black / K',   default: '#000000' },
-      { key: 'ink_cyan_color',    label: 'Cyan Ink',    desc: 'Ring colour for cyan / C',    default: '#00ffff' },
-      { key: 'ink_magenta_color', label: 'Magenta Ink', desc: 'Ring colour for magenta / M', default: '#ff00ff' },
-      { key: 'ink_yellow_color',  label: 'Yellow Ink',  desc: 'Ring colour for yellow / Y',  default: '#ffff00' },
-      { key: 'card_bg',           label: 'Card BG',     desc: 'Card background colour',      default: '#1c1c1e' },
-      { key: 'text_color',        label: 'Text',        desc: 'Primary text colour',         default: '#ffffff' },
+      { key: 'ink_black_color',   label: 'Black Ink',        desc: 'Ring colour for black / K',   default: '#000000' },
+      { key: 'ink_cyan_color',    label: 'Cyan Ink',         desc: 'Ring colour for cyan / C',    default: '#00ffff' },
+      { key: 'ink_magenta_color', label: 'Magenta Ink',      desc: 'Ring colour for magenta / M', default: '#ff00ff' },
+      { key: 'ink_yellow_color',  label: 'Yellow Ink',       desc: 'Ring colour for yellow / Y',  default: '#ffff00' },
+      { key: 'pct_text_color',    label: 'Percentage Text',  desc: 'Number shown inside each ring', default: '#ffffff' },
+      { key: 'card_bg',           label: 'Card BG',          desc: 'Card background colour',      default: '#1c1c1e' },
+      { key: 'text_color',        label: 'Text',             desc: 'Primary text colour',         default: '#ffffff' },
     ];
   }
 
