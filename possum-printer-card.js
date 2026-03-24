@@ -38,6 +38,8 @@ class PossumPrinterCard extends HTMLElement {
       ink_magenta_color:    '#ff00ff',
       ink_yellow_color:     '#ffff00',
       pct_text_color:       '#ffffff',
+      smart_plug_enabled:   false,
+      smart_plug_entity:    '',
     };
   }
 
@@ -293,7 +295,7 @@ class PossumPrinterCard extends HTMLElement {
                   <div class="pp-ring-center">
                     <span class="pp-pct" id="pp-pct-${ink.key}" style="color:${cfg.pct_text_color || '#ffffff'}">--</span>
                     <span class="pp-pct-unit">%</span>
-                    <span class="pp-offline-text">Off</span>
+                    <span class="pp-offline-text">--</span>
                   </div>
                 </div>
                 <span class="pp-colour-label">${ink.label}</span>
@@ -454,11 +456,63 @@ class PossumPrinterCard extends HTMLElement {
 
     // Status pill click
     const pill = root.getElementById('pp-status-pill');
-    if (pill) pill.addEventListener('click', () => this._openStatusPopup());
+    if (pill) pill.addEventListener('click', () => this._handlePillClick());
 
     // Title click
     const title = root.getElementById('pp-title');
     if (title) title.addEventListener('click', () => this._openStatusPopup());
+  }
+
+  _handlePillClick() {
+    const cfg     = this._config;
+    const hass    = this._hass;
+    const plugId  = cfg.smart_plug_entity;
+    const enabled = cfg.smart_plug_enabled;
+
+    if (!enabled || !plugId) {
+      this._openStatusPopup();
+      return;
+    }
+
+    const printerStateObj = cfg.printer_entity ? hass?.states[cfg.printer_entity] : null;
+    const statusRaw = (printerStateObj?.state || '').toLowerCase();
+    const isOffline = !printerStateObj ||
+      ['unavailable', 'unknown', 'offline'].includes(statusRaw);
+
+    if (isOffline) {
+      // Printer is off — turn smart plug ON to power it up
+      hass.callService('homeassistant', 'turn_on', { entity_id: plugId });
+      this._showPillFeedback('Turning on…', '#34C759');
+    } else if (statusRaw === 'idle') {
+      // Printer is idle — turn smart plug OFF to save power
+      hass.callService('homeassistant', 'turn_off', { entity_id: plugId });
+      this._showPillFeedback('Turning off…', '#FF9500');
+    } else {
+      // Any other state — just show the info popup
+      this._openStatusPopup();
+    }
+  }
+
+  _showPillFeedback(text, color) {
+    const root      = this.shadowRoot;
+    const textEl    = root.getElementById('pp-status-text');
+    const dotEl     = root.getElementById('pp-status-dot');
+    const pillEl    = root.getElementById('pp-status-pill');
+    if (!textEl || !dotEl || !pillEl) return;
+
+    const origText       = textEl.textContent;
+    const origDotColor   = dotEl.style.background;
+    const origBorderColor = pillEl.style.borderColor;
+
+    textEl.textContent       = text;
+    dotEl.style.background   = color;
+    pillEl.style.borderColor = `${color}88`;
+
+    setTimeout(() => {
+      textEl.textContent       = origText;
+      dotEl.style.background   = origDotColor;
+      pillEl.style.borderColor = origBorderColor;
+    }, 2000);
   }
 
   _fireMoreInfo(entityId) {
@@ -739,7 +793,12 @@ class PossumPrinterCardEditor extends HTMLElement {
     setVal('ink_yellow_entity',  cfg.ink_yellow_entity  || '');
     setVal('friendly_name',      cfg.friendly_name      || '');
     setVal('card_bg_opacity',    cfg.card_bg_opacity    ?? 80);
+    setVal('smart_plug_entity',  cfg.smart_plug_entity  || '');
     setChk('show_name',          cfg.show_name !== false);
+    setChk('smart_plug_enabled', cfg.smart_plug_enabled === true);
+
+    const plugSection = root.getElementById('smart_plug_entity_row');
+    if (plugSection) plugSection.style.display = cfg.smart_plug_enabled ? '' : 'none';
 
     const opLabel = root.getElementById('opacity-val');
     if (opLabel) opLabel.textContent = `${cfg.card_bg_opacity ?? 80}%`;
@@ -795,6 +854,7 @@ class PossumPrinterCardEditor extends HTMLElement {
     const cyanKws    = [...inkKws, 'cyan','_c_','cb'];
     const magentaKws = [...inkKws, 'magenta','_m_','mag'];
     const yellowKws  = [...inkKws, 'yellow','_y_','yel'];
+    const plugKws    = ['plug','socket','outlet','switch','power','tasmota','shelly','tp_link','kasa','sonoff','wemo','hue_plug','ikea_outlet','smart_plug'];
 
     // Score every entity for printer likelihood; keep those with score > 0 plus some numeric-looking ones
     const printerCandidates = allEntities
@@ -812,6 +872,25 @@ class PossumPrinterCardEditor extends HTMLElement {
     const magentaCandidates = makeSensorCandidates(magentaKws);
     const yellowCandidates  = makeSensorCandidates(yellowKws);
 
+    // Smart plug: switch.* and input_boolean.* domains, scored by plug keywords
+    // Also boost anything whose name/id shares a word with the printer friendly name
+    const printerName = (cfg.printer_entity ? (hass.states[cfg.printer_entity]?.attributes?.friendly_name || cfg.printer_entity) : '').toLowerCase();
+    const allSwitches = allEntities.filter(e => e.startsWith('switch.') || e.startsWith('input_boolean.'));
+    const plugCandidates = allSwitches
+      .map(e => {
+        const id2   = e.toLowerCase();
+        const name2 = getName(e).toLowerCase();
+        let score   = plugKws.reduce((s, k) => s + (id2.includes(k) || name2.includes(k) ? 1 : 0), 0);
+        // Bonus if it shares a meaningful word with the printer name
+        if (printerName) {
+          printerName.split(/\W+/).filter(w => w.length > 3).forEach(w => {
+            if (id2.includes(w) || name2.includes(w)) score += 2;
+          });
+        }
+        return { e, score };
+      })
+      .sort((a, b) => b.score - a.score || a.e.localeCompare(b.e));
+
     // Auto-select if not yet configured
     const autoSelect = (cfgKey, candidates) => {
       if (!cfg[cfgKey] && candidates.length && candidates[0].score > 0) {
@@ -824,6 +903,7 @@ class PossumPrinterCardEditor extends HTMLElement {
     autoSelect('ink_cyan_entity',    cyanCandidates);
     autoSelect('ink_magenta_entity', magentaCandidates);
     autoSelect('ink_yellow_entity',  yellowCandidates);
+    // Don't auto-select smart plug — too risky to switch something on/off without explicit user choice
 
     // Build <option> HTML with suggested items first
     const buildOptions = (candidates, pool, selectedVal) => {
@@ -845,6 +925,7 @@ class PossumPrinterCardEditor extends HTMLElement {
     const cyanOpts    = buildOptions(cyanCandidates,    allSensors,  cfg.ink_cyan_entity    || '');
     const magentaOpts = buildOptions(magentaCandidates, allSensors,  cfg.ink_magenta_entity || '');
     const yellowOpts  = buildOptions(yellowCandidates,  allSensors,  cfg.ink_yellow_entity  || '');
+    const plugOpts    = buildOptions(plugCandidates,    allSwitches, cfg.smart_plug_entity  || '');
 
     const COLOUR_FIELDS = this._getColourFields();
 
@@ -1049,6 +1130,34 @@ class PossumPrinterCardEditor extends HTMLElement {
           </div>
         </div>
 
+        <!-- Smart Plug -->
+        <div>
+          <div class="section-title">Smart Plug</div>
+          <div class="card-block">
+            <div class="toggle-list">
+              <div class="toggle-item">
+                <div>
+                  <div class="toggle-label">Enable Smart Plug Control</div>
+                  <div class="toggle-sub">Tap pill to turn on/off when Idle or Offline</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="smart_plug_enabled" ${cfg.smart_plug_enabled ? 'checked' : ''}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="smart_plug_entity_row" style="${cfg.smart_plug_enabled ? '' : 'display:none'}">
+              <div class="select-row" style="padding-top:0;">
+                <label for="smart_plug_entity">Plug / Switch Entity</label>
+                <input class="entity-search" type="text" id="plug_search" placeholder="Search switches…">
+                <select id="smart_plug_entity">${plugOpts}</select>
+                <span class="hint">★ = likely smart plugs listed first · switches &amp; input booleans only</span>
+                <span class="hint" style="margin-top:2px;">Idle pill → turns plug <strong>off</strong> &nbsp;|&nbsp; Offline pill → turns plug <strong>on</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Colours -->
         <div>
           <div class="section-title">Colours</div>
@@ -1162,6 +1271,7 @@ class PossumPrinterCardEditor extends HTMLElement {
     wireSearch('cyan_search',    'ink_cyan_entity',    makeData(cyanCandidates,    allSensors));
     wireSearch('magenta_search', 'ink_magenta_entity', makeData(magentaCandidates, allSensors));
     wireSearch('yellow_search',  'ink_yellow_entity',  makeData(yellowCandidates,  allSensors));
+    wireSearch('plug_search',    'smart_plug_entity',  makeData(plugCandidates,    allSwitches));
   }
 
   _setupListeners() {
@@ -1180,6 +1290,14 @@ class PossumPrinterCardEditor extends HTMLElement {
       this._updateConfig('show_name', e.target.checked);
       const nameRow = root.getElementById('friendly_name_row');
       if (nameRow) nameRow.style.display = e.target.checked ? '' : 'none';
+    };
+
+    get('smart_plug_entity').onchange = e => this._updateConfig('smart_plug_entity', e.target.value);
+
+    get('smart_plug_enabled').onchange = e => {
+      this._updateConfig('smart_plug_enabled', e.target.checked);
+      const plugRow = root.getElementById('smart_plug_entity_row');
+      if (plugRow) plugRow.style.display = e.target.checked ? '' : 'none';
     };
 
     get('card_bg_opacity').oninput = e => {
