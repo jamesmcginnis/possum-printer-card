@@ -15,8 +15,8 @@ class PossumPrinterCard extends HTMLElement {
     this._longPressTimers    = {};
     this._longPressFired     = {};
     this._popupOverlay       = null;
-    this._bootingUp          = false;
-    this._bootFlashInterval  = null;
+    this._pillFlashState     = null;   // 'on' | 'off' | null
+    this._pillFlashInterval  = null;
   }
 
   static getConfigElement() {
@@ -57,7 +57,7 @@ class PossumPrinterCard extends HTMLElement {
   }
 
   connectedCallback() {}
-  disconnectedCallback() { this._stopBootFlash(); }
+  disconnectedCallback() { this._stopPillFlash(); }
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -328,6 +328,26 @@ class PossumPrinterCard extends HTMLElement {
       { key: 'yellow',  entityKey: 'ink_yellow_entity',  colorKey: 'ink_yellow_color',  def: '#ffff00' },
     ];
 
+    // ── Ink availability helpers (used to detect boot/shutdown completion) ──
+    const configuredInkEntities = [
+      cfg.ink_black_entity, cfg.ink_cyan_entity,
+      cfg.ink_magenta_entity, cfg.ink_yellow_entity,
+    ].filter(Boolean);
+
+    // At least one ink entity has a valid numeric reading → printer is up
+    const inkAvailable = configuredInkEntities.length > 0 &&
+      configuredInkEntities.some(id => {
+        const s = hass.states[id]?.state;
+        return s && !['unavailable','unknown'].includes(s) && !isNaN(parseFloat(s));
+      });
+
+    // Every configured ink entity is unavailable/unknown/missing → printer is down
+    const inkAllUnavailable = configuredInkEntities.length === 0 ||
+      configuredInkEntities.every(id => {
+        const s = hass.states[id]?.state;
+        return !s || ['unavailable','unknown'].includes(s) || isNaN(parseFloat(s));
+      });
+
     // ── Printer status pill ──
     const printerStateObj = cfg.printer_entity ? hass.states[cfg.printer_entity] : null;
     const statusRaw  = printerStateObj?.state || '';
@@ -335,13 +355,12 @@ class PossumPrinterCard extends HTMLElement {
     const isOffline  = !!cfg.printer_entity &&
       (!printerStateObj || ['unavailable','unknown'].includes(statusRaw) || statusRaw.toLowerCase() === 'offline');
 
-    // If we were waiting for the printer to boot and it's now online, stop flashing
-    if (this._bootingUp && !isOffline) {
-      this._stopBootFlash();
-    }
+    // Resolve flash state: stop when the expected condition is met
+    if (this._pillFlashState === 'on'  && inkAvailable)       this._stopPillFlash();
+    if (this._pillFlashState === 'off' && inkAllUnavailable)  this._stopPillFlash();
 
-    // Only update pill DOM when not mid-boot-flash (flash loop owns those elements)
-    if (!this._bootingUp) {
+    // Only update pill DOM when not mid-flash (flash loop owns those elements)
+    if (!this._pillFlashState) {
       const statusTextEl = root.getElementById('pp-status-text');
       const statusDotEl  = root.getElementById('pp-status-dot');
       const statusPillEl = root.getElementById('pp-status-pill');
@@ -490,20 +509,21 @@ class PossumPrinterCard extends HTMLElement {
     if (isOffline) {
       // Printer is off — turn smart plug ON to power it up
       hass.callService('homeassistant', 'turn_on', { entity_id: plugId });
-      this._startBootFlash();
+      this._startPillFlash('on');
     } else if (statusRaw === 'idle') {
       // Printer is idle — turn smart plug OFF to save power
       hass.callService('homeassistant', 'turn_off', { entity_id: plugId });
-      this._showPillFeedback('Turning off…', '#FF9500');
+      this._startPillFlash('off');
     } else {
       // Any other state — just show the info popup
       this._openStatusPopup();
     }
   }
 
-  _startBootFlash() {
-    this._stopBootFlash(); // clear any previous
-    this._bootingUp = true;
+  _startPillFlash(mode) {
+    // mode: 'on' (powering up) | 'off' (powering down)
+    this._stopPillFlash();
+    this._pillFlashState = mode;
 
     const root   = this.shadowRoot;
     const textEl = root.getElementById('pp-status-text');
@@ -511,55 +531,37 @@ class PossumPrinterCard extends HTMLElement {
     const pillEl = root.getElementById('pp-status-pill');
     if (!textEl || !dotEl || !pillEl) return;
 
+    const LABEL  = mode === 'on' ? 'Powering On' : 'Powering Off';
     const YELLOW = '#FF9500';
-    let flash = true;
+    let flash    = true;
 
     const apply = () => {
-      if (!this._bootingUp) return;
-      textEl.textContent       = 'Starting…';
-      dotEl.style.background   = flash ? YELLOW : 'rgba(255,255,255,0.18)';
-      pillEl.style.borderColor = flash ? `${YELLOW}88` : 'rgba(255,255,255,0.10)';
-      pillEl.style.color       = flash ? YELLOW : 'rgba(255,255,255,0.35)';
+      if (!this._pillFlashState) return;
+      textEl.textContent       = LABEL;
+      dotEl.style.background   = flash ? YELLOW : 'rgba(255,255,255,0.15)';
+      pillEl.style.borderColor = flash ? `${YELLOW}88` : 'rgba(255,255,255,0.08)';
+      pillEl.style.color       = flash ? YELLOW : 'rgba(255,255,255,0.30)';
       flash = !flash;
     };
 
     apply();
-    this._bootFlashInterval = setInterval(apply, 600);
+    this._pillFlashInterval = setInterval(apply, 600);
   }
 
-  _stopBootFlash() {
-    if (this._bootFlashInterval) {
-      clearInterval(this._bootFlashInterval);
-      this._bootFlashInterval = null;
+  _stopPillFlash() {
+    if (this._pillFlashInterval) {
+      clearInterval(this._pillFlashInterval);
+      this._pillFlashInterval = null;
     }
-    this._bootingUp = false;
+    this._pillFlashState = null;
 
-    // Reset any inline styles set by the flash so _updateCard takes over cleanly
+    // Clear inline styles so _updateCard can take over cleanly
     const root   = this.shadowRoot;
     const pillEl = root.getElementById('pp-status-pill');
-    if (pillEl) pillEl.style.color = '';
-  }
-
-  _showPillFeedback(text, color) {
-    const root      = this.shadowRoot;
-    const textEl    = root.getElementById('pp-status-text');
-    const dotEl     = root.getElementById('pp-status-dot');
-    const pillEl    = root.getElementById('pp-status-pill');
-    if (!textEl || !dotEl || !pillEl) return;
-
-    const origText        = textEl.textContent;
-    const origDotColor    = dotEl.style.background;
-    const origBorderColor = pillEl.style.borderColor;
-
-    textEl.textContent       = text;
-    dotEl.style.background   = color;
-    pillEl.style.borderColor = `${color}88`;
-
-    setTimeout(() => {
-      textEl.textContent       = origText;
-      dotEl.style.background   = origDotColor;
-      pillEl.style.borderColor = origBorderColor;
-    }, 2000);
+    if (pillEl) {
+      pillEl.style.color       = '';
+      pillEl.style.borderColor = '';
+    }
   }
 
   _fireMoreInfo(entityId) {
