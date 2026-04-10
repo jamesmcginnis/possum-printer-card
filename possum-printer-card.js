@@ -510,17 +510,95 @@ class PossumPrinterCard extends HTMLElement {
       ['unavailable', 'unknown', 'offline'].includes(statusRaw);
 
     if (isOffline) {
-      // Printer is off — turn smart plug ON to power it up
-      hass.callService('homeassistant', 'turn_on', { entity_id: plugId });
-      this._startPillFlash('on');
+      // Printer is off — confirm before turning smart plug ON
+      this._openPlugConfirmPopup('on');
     } else if (statusRaw === 'idle') {
-      // Printer is idle — turn smart plug OFF to save power
-      hass.callService('homeassistant', 'turn_off', { entity_id: plugId });
-      this._startPillFlash('off');
+      // Printer is idle — confirm before turning smart plug OFF
+      this._openPlugConfirmPopup('off');
     } else {
       // Any other state — just show the info popup
       this._openStatusPopup();
     }
+  }
+
+  _openPlugConfirmPopup(mode) {
+    // mode: 'on' | 'off'
+    const cfg      = this._config;
+    const hass     = this._hass;
+    const plugId   = cfg.smart_plug_entity;
+    const name     = cfg.friendly_name || 'Printer';
+
+    const isTurningOn = mode === 'on';
+    const accentColor = isTurningOn ? '#34C759' : '#FF9500';
+    const iconEmoji   = isTurningOn ? '🖨️' : '⚡';
+
+    const titleText   = isTurningOn ? 'Turn On Printer?' : 'Turn Off Printer?';
+    const messageText = isTurningOn
+      ? `Ready to wake up ${name}? The printer will power on and warm up — this may take a moment.`
+      : `Done printing? Turning off ${name} will cut power to the smart plug and save energy.`;
+    const confirmLabel = isTurningOn ? 'Yes, Turn On' : 'Yes, Turn Off';
+    const cancelLabel  = 'Cancel';
+
+    const popup = this._createPopupBase(isTurningOn ? 'Power On' : 'Power Off');
+    if (!popup) return;
+
+    // Hero icon + title
+    const hero = document.createElement('div');
+    hero.style.cssText = 'display:flex;align-items:center;gap:16px;margin-bottom:18px;';
+    hero.innerHTML = `
+      <div style="width:56px;height:56px;border-radius:16px;background:${accentColor}1a;border:1.5px solid ${accentColor}44;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:26px;">
+        ${iconEmoji}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.2;margin-bottom:6px;">${titleText}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.50);line-height:1.4;">${messageText}</div>
+      </div>`;
+    popup.appendChild(hero);
+
+    // Button row
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;margin-top:20px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = cancelLabel;
+    cancelBtn.style.cssText = `
+      flex:1;padding:12px 0;border-radius:14px;border:1px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.70);
+      font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+      transition:background 0.15s;`;
+    cancelBtn.addEventListener('mouseenter', () => { cancelBtn.style.background = 'rgba(255,255,255,0.14)'; });
+    cancelBtn.addEventListener('mouseleave', () => { cancelBtn.style.background = 'rgba(255,255,255,0.08)'; });
+    cancelBtn.addEventListener('click', () => this._closePopup());
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.style.cssText = `
+      flex:1;padding:12px 0;border-radius:14px;border:1.5px solid ${accentColor}66;
+      background:${accentColor}22;color:${accentColor};
+      font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+      transition:background 0.15s,border-color 0.15s;`;
+    confirmBtn.addEventListener('mouseenter', () => {
+      confirmBtn.style.background    = `${accentColor}38`;
+      confirmBtn.style.borderColor   = `${accentColor}99`;
+    });
+    confirmBtn.addEventListener('mouseleave', () => {
+      confirmBtn.style.background    = `${accentColor}22`;
+      confirmBtn.style.borderColor   = `${accentColor}66`;
+    });
+    confirmBtn.addEventListener('click', () => {
+      this._closePopup();
+      if (isTurningOn) {
+        hass.callService('homeassistant', 'turn_on', { entity_id: plugId });
+        this._startPillFlash('on');
+      } else {
+        hass.callService('homeassistant', 'turn_off', { entity_id: plugId });
+        this._startPillFlash('off');
+      }
+    });
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    popup.appendChild(btnRow);
   }
 
   _startPillFlash(mode) {
