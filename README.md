@@ -10,7 +10,7 @@ A Home Assistant Dashboard card that shows your printer's ink and toner levels a
 - **Status pill** — shows Idle, Printing, Ready, Sleep, Error, and more with a matching colour-coded dot
 - **Offline detection** — all rings grey out and display `--` when the printer is unavailable
 - **Smart plug control** — optionally link a smart plug or switch; tap the pill to turn the printer on when Offline or off when Idle
-- **Powering On flash** — after tapping to power on, the pill flashes amber *Powering On* until the ink level sensors become available, then returns to normal
+- **Powering On flash** — after tapping to power on, the pill flashes amber *Powering On* until all ink level sensors are reporting valid readings, then returns to normal
 - **Powering Off flash** — after tapping to power off, the pill flashes amber *Powering Off* until the ink level sensors go unavailable, then returns to normal
 - **Tap a ring** — opens a polished popup with level badge (Good / Running Low / Replace Soon), entity attributes, and last-updated time
 - **Long-press a ring** — opens the native Home Assistant More Info dialog for that entity
@@ -18,22 +18,6 @@ A Home Assistant Dashboard card that shows your printer's ink and toner levels a
 - **Tap the printer name** — opens the printer status popup
 - **Optional friendly name** — displayed in the card header
 - **Full visual editor** — smart entity detection, per-ink colour pickers, percentage text colour, hex input, and background opacity slider
-
----
-
-## 📸 Preview
-
-<p align="center">
-  <img src="preview1.png" alt="Possum Printer Card — normal view" width="380">
-  &nbsp;&nbsp;
-  <img src="preview2.png" alt="Possum Printer Card — ink popup" width="380">
-</p>
-
-<p align="center">
-  <img src="preview3.png" alt="Possum Printer Card — status popup" width="380">
-  &nbsp;&nbsp;
-  <img src="preview4.png" alt="Possum Printer Card — offline state" width="380">
-</p>
 
 ---
 
@@ -123,7 +107,7 @@ smart_plug_entity: switch.printer_plug
 | **Tap** a ring | Opens a custom info popup for that ink colour |
 | **Long-press** a ring | Opens the native HA More Info dialog |
 | **Tap** the status pill *(smart plug disabled)* | Opens printer status popup |
-| **Tap** the status pill — **Offline** *(smart plug enabled)* | Turns plug **on** · pill flashes *Powering On* until ink sensors are available |
+| **Tap** the status pill — **Offline** *(smart plug enabled)* | Turns plug **on** · pill flashes *Powering On* until all ink sensors are available |
 | **Tap** the status pill — **Idle** *(smart plug enabled)* | Turns plug **off** · pill flashes *Powering Off* until ink sensors are unavailable |
 | **Tap** the status pill — any other state | Opens printer status popup |
 | **Tap** the printer name | Opens printer status popup |
@@ -135,7 +119,7 @@ smart_plug_entity: switch.printer_plug
 When smart plug control is enabled the status pill doubles as a contextual power button:
 
 **Powering on (Offline → tap):**
-The plug turns on and the pill immediately begins flashing amber *Powering On*. It keeps flashing until Home Assistant reports that at least one of the configured ink level sensors returns a valid reading — the clearest signal that the printer is fully up. At that point the pill returns to its normal label (Ready, Idle, etc.).
+The plug turns on and the pill immediately begins flashing amber *Powering On*. It keeps flashing until Home Assistant reports that all configured ink level sensors are returning valid readings — confirming that the printer is fully up and all rings are populated. At that point the pill returns to its normal label (Ready, Idle, etc.).
 
 **Powering off (Idle → tap):**
 The plug turns off and the pill immediately begins flashing amber *Powering Off*. It keeps flashing until every configured ink level sensor goes unavailable — confirming the printer has fully powered down. At that point the pill returns to its normal Offline state.
@@ -149,15 +133,6 @@ The feature works with any `switch.*` or `input_boolean.*` entity, including dev
 
 ---
 
-## 🖨️ Supported Printer Integrations
-
-Any integration that exposes ink or toner levels as sensor entities with a numeric state (0–100) will work, including:
-
-- [Brother Printer](https://www.home-assistant.io/integrations/brother/)
-- [IPP (Internet Printing Protocol)](https://www.home-assistant.io/integrations/ipp/)
-- Custom SNMP/REST sensors
-
----
 
 ## 📄 License
 
