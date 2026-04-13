@@ -351,6 +351,13 @@ class PossumPrinterCard extends HTMLElement {
         return !s || ['unavailable','unknown'].includes(s) || isNaN(parseFloat(s));
       });
 
+    // Every configured ink entity has a valid numeric reading → all rings are showing
+    const inkAllAvailable = configuredInkEntities.length > 0 &&
+      configuredInkEntities.every(id => {
+        const s = hass.states[id]?.state;
+        return s && !['unavailable','unknown'].includes(s) && !isNaN(parseFloat(s));
+      });
+
     // ── Printer status pill ──
     const printerStateObj = cfg.printer_entity ? hass.states[cfg.printer_entity] : null;
     const statusRaw  = printerStateObj?.state || '';
@@ -359,7 +366,8 @@ class PossumPrinterCard extends HTMLElement {
       (!printerStateObj || ['unavailable','unknown'].includes(statusRaw) || statusRaw.toLowerCase() === 'offline');
 
     // Resolve flash state: stop when the expected condition is met
-    if (this._pillFlashState === 'on'  && inkAvailable)       this._stopPillFlash();
+    // 'on'  — wait until ALL ink entities are showing values (all rings populated)
+    if (this._pillFlashState === 'on'  && inkAllAvailable)    this._stopPillFlash();
     if (this._pillFlashState === 'off' && inkAllUnavailable)  this._stopPillFlash();
 
     // Only update pill DOM when not mid-flash (flash loop owns those elements)
