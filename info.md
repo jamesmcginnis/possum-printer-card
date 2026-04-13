@@ -4,21 +4,13 @@ A Home Assistant Dashboard card that displays printer ink and toner levels as sm
 
 ---
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/jamesmcginnis/possum-printer-card/main/preview1.png" alt="Possum Printer Card preview" width="380">
-  &nbsp;
-  <img src="https://raw.githubusercontent.com/jamesmcginnis/possum-printer-card/main/preview2.png" alt="Possum Printer Card popup" width="380">
-</p>
-
----
-
 ## ✨ What it does
 
 - **Four animated rings** showing Black, Cyan, Magenta, and Yellow ink/toner levels with a breathing glow effect
 - **Status pill** — Idle, Printing, Ready, Sleep, Error — with a colour-coded dot
 - **Offline mode** — all rings grey out and show `--` when the printer is unavailable
 - **Smart plug control** — link any `switch.*` entity to the status pill; tap to power the printer on or off
-- **Powering On flash** — pill flashes amber *Powering On* after turning on, stopping only when ink sensors report real values
+- **Powering On flash** — pill flashes amber *Powering On* after turning on, stopping only when all ink sensors are reporting real values
 - **Powering Off flash** — pill flashes amber *Powering Off* after turning off, stopping only when ink sensors go unavailable
 - **Tap a ring** for a detailed popup: level badge, entity attributes, and last-updated time
 - **Long-press a ring** to open the native Home Assistant More Info panel
@@ -33,7 +25,7 @@ Enable the smart plug option in the visual editor and link any switch or plug en
 
 | Pill state | Tap action |
 |---|---|
-| **Offline** | Turns plug **on** — pill flashes amber *Powering On* until ink sensors return valid readings |
+| **Offline** | Turns plug **on** — pill flashes amber *Powering On* until all ink sensors return valid readings |
 | **Idle** | Turns plug **off** — pill flashes amber *Powering Off* until ink sensors go unavailable |
 | Printing / Ready / Error / other | Opens the status info popup |
 
